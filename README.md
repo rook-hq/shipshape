@@ -229,10 +229,10 @@ Then start a new Codex conversation in the repository you want to set up and
 run `$shipshape-init`. The bundled `.codex-plugin/plugin.json` describes the
 plugin; adding that manifest to a checkout does not install it by itself.
 
-`main` is version 0.5.0. Install from that default branch, plugin version
-0.5.0, until the next GitHub Release is cut. The Releases page latest is still
-[v0.2.1](https://github.com/rook-hq/shipshape/releases/tag/v0.2.1). 0.3.0,
-0.4.0, and 0.5.0 were not tagged, so that page is behind `main`.
+`main` is version 0.5.0. The latest GitHub Release is
+[v0.5.0](https://github.com/rook-hq/shipshape/releases/tag/v0.5.0).
+0.3.0 and 0.4.0 were never tagged. Marketplace installs clone the default
+branch. They do not download a Release.
 
 `codex plugin marketplace add rook-hq/shipshape` and
 `/plugin marketplace add rook-hq/shipshape` clone this repository. They do not
@@ -307,7 +307,10 @@ Prerequisites for the GitHub repository:
 Steps:
 
 1. Install shipshape from the default branch `main`, plugin version 0.5.0.
-   The Releases page latest, v0.2.1, is behind `main`.
+   The latest GitHub Release is
+   [v0.5.0](https://github.com/rook-hq/shipshape/releases/tag/v0.5.0).
+   0.3.0 and 0.4.0 were never tagged. A marketplace install clones that
+   default branch. It does not download a Release.
 2. In the product repository, run shipshape-init. Read the preview, then apply
    it. Nothing is written before you accept the preview.
 3. Install the local secret-guard hook with `bash .sdlc/hooks/install.sh`.
