@@ -1478,7 +1478,7 @@ def test_non_github_origin_names_the_owner_repo_fix() -> None:
         assert refused.returncode == 1, refused.stdout
         error = json.loads(refused.stdout)["error"]
         assert "features.branch_protection is on" in error, error
-        assert "github.com" in error, error
+        assert "not a github.com repository" in error, error
         assert "--set repo.owner_repo=owner/repo" in error, error
         assert "repository must be an exact owner/name slug" in error, error
         assert not (local / ".sdlc" / "config.json").exists()
