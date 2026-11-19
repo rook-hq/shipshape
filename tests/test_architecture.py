@@ -77,6 +77,47 @@ def test_render_is_deterministic_for_the_same_detect_input():
         assert not block.lstrip().startswith("---")
 
 
+def test_flowchart_node_labels_are_double_quoted():
+    """Mermaid 11 rejects unquoted labels that contain parentheses."""
+    architecture, _render = load_render()
+    tricky = "end --> core: # & (suite)"
+    options = {"views": ["system_context", "container", "request_flow"], "max_nodes": 9}
+    rendered = architecture.render_overview(
+        sample_detect(root=tricky, test_runners=[tricky], package_managers=[tricky]),
+        options,
+        "0.4.0",
+    )
+    node_line = re.compile(r'^  [A-Za-z_][A-Za-z0-9_]*\["[^"]*"\](?::::accent)?$')
+    edge_line = re.compile(r"^  [A-Za-z_][A-Za-z0-9_]* --> [A-Za-z_][A-Za-z0-9_]*$")
+    seen = {token: False for token in ("(", ")", "#", "&", ":", "-->", "end")}
+    charts = flowchart_blocks(rendered)
+    assert charts
+    for block in charts:
+        assert re.search(r"\[[^\"\n]", block) is None
+        for line in block.splitlines():
+            if line.startswith("flowchart ") or line.startswith("  classDef "):
+                continue
+            if edge_line.match(line):
+                continue
+            assert node_line.match(line), line
+            label = line.split('["', 1)[1].split('"]', 1)[0]
+            for token in seen:
+                if token in label:
+                    seen[token] = True
+    assert seen == dict.fromkeys(seen, True)
+    capped = architecture.render_overview(
+        sample_detect(frameworks=[f"framework{index}" for index in range(12)], test_runners=[]),
+        {"views": ["container"], "max_nodes": 9},
+        "0.4.0",
+    )
+    assert re.search(r'\["Other parts \(\d+\)"\]', capped)
+    sequence = next(
+        block for block in mermaid_blocks(rendered) if block.startswith("sequenceDiagram")
+    )
+    assert 'participant App as "' in sequence
+    assert re.search(r'participant \w+ as "[^"]+"', sequence)
+
+
 def test_each_flowchart_uses_one_accent_class_on_the_focal_node_only():
     architecture, _render = load_render()
     options = {"views": ["system_context", "container", "request_flow"], "max_nodes": 9}
@@ -91,7 +132,7 @@ def test_each_flowchart_uses_one_accent_class_on_the_focal_node_only():
     sequence = [block for block in mermaid_blocks(rendered) if "sequenceDiagram" in block]
     assert len(sequence) == 1
     assert "classDef" not in sequence[0]
-    assert "participant App as FastAPI" in sequence[0]
+    assert 'participant App as "FastAPI"' in sequence[0]
 
 
 def test_node_cap_groups_the_overflow_into_one_node():

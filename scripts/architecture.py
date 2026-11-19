@@ -73,7 +73,9 @@ SCRIPT_PURPOSES = {
         "architecture diagrams. It does not change project setup."
     ),
 }
-_UNSAFE_LABEL = re.compile(r"[\r\n\t\[\]\{\}<>|`\";]")
+# Quoted labels keep parentheses, arrows, and the word "end". Only characters
+# that would close the ["..."] delimiters, or break the line, are removed.
+_UNSAFE_LABEL = re.compile(r"[\r\n\t\[\]\{\}<|`\";]")
 _BLOCK_RE = {
     view: re.compile(
         rf"<!-- shipshape:architecture:{re.escape(view)}:start -->\n"
@@ -270,12 +272,17 @@ def container_nodes(detected: dict, max_nodes: int) -> list[Node]:
     return cap_nodes(focal, others, max_nodes)
 
 
+def quoted_label(label: str) -> str:
+    """Mermaid 11 parses id["text"] and rejects unquoted parentheses."""
+    return '"' + label.replace('"', "") + '"'
+
+
 def flowchart(direction: str, nodes: list[Node], linked: list[tuple[str, str]]) -> str:
     focal_id = nodes[0].id
     lines = [f"flowchart {direction}"]
     for node in nodes:
         suffix = ":::accent" if node.id == focal_id else ""
-        lines.append(f"  {node.id}[{node.label}]{suffix}")
+        lines.append(f"  {node.id}[{quoted_label(node.label)}]{suffix}")
     for source, target in linked:
         lines.append(f"  {source} --> {target}")
     lines.append(f"  {ACCENT_CLASS}")
@@ -297,8 +304,8 @@ def request_flow(detected: dict) -> str | None:
     return "\n".join(
         [
             "sequenceDiagram",
-            "  actor Person",
-            f"  participant App as {label}",
+            f"  actor Person as {quoted_label('Person')}",
+            f"  participant App as {quoted_label(label)}",
             "  Person->>App: HTTP request",
             "  App-->>Person: HTTP response",
         ]

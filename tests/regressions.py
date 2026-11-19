@@ -1543,6 +1543,16 @@ def test_non_github_origin_names_the_owner_repo_fix() -> None:
         assert json.loads(github_init.stdout)["config"]["repo"]["owner_repo"] == "example/widget"
 
 
+def test_mermaid_node_labels_are_quoted_for_github() -> None:
+    """2026-11-19: unquoted labels such as Tests (pytest) and Other parts (N)
+    failed Mermaid 11 on GitHub with 'Unable to render'. beautiful-mermaid
+    still accepted them. Guard: every flowchart node label is double-quoted,
+    including parentheses, #, &, :, -->, and the word end."""
+    run_focused_pytest(
+        "tests/test_architecture.py::test_flowchart_node_labels_are_double_quoted",
+    )
+
+
 def test_architecture_diagrams_fail_soft_and_stay_marked() -> None:
     """2026-11-19: diagram generation could have failed init, or a re-apply
     could have erased notes outside the generated blocks. Guard: the same
@@ -1906,6 +1916,10 @@ def main() -> int:
         (
             "architecture diagrams fail soft and stay marked",
             test_architecture_diagrams_fail_soft_and_stay_marked,
+        ),
+        (
+            "mermaid node labels are quoted for GitHub",
+            test_mermaid_node_labels_are_quoted_for_github,
         ),
     ]
     failures = 0
