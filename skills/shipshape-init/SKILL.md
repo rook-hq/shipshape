@@ -151,6 +151,9 @@ export SHIPSHAPE_ROOT="/absolute/path/to/the/loaded/shipshape/bundle"
 
    Accept the reviewed binding only when `binding.status` is `matched`. Report
    `status`, every written or removed path, and every untouched conflict.
+   If the JSON includes `warnings`, say each one in plain words. A skipped
+   architecture diagram (a picture of the system drawn from the scan) does
+   not undo the rest of the setup.
    `partial` means some managed files remain at an earlier version; do not
    describe that result as fully upgraded. If status is `stale-plan`, return to
    step 5 and show the changed scope. Retain approvals for unchanged paths and
@@ -216,8 +219,10 @@ export SHIPSHAPE_ROOT="/absolute/path/to/the/loaded/shipshape/bundle"
    not proof that their GitHub runs succeeded. Report the protection plan/apply
    result from step 8; a config flag alone is not remote proof. In trunk mode,
    checks run after a direct push, so they are not pre-landing enforcement. Name
-   `docs/sdlc/harness.md` as the plan of record,
-   suggest `/shipshape-doctor` as the anytime health check and
+   `docs/sdlc/harness.md` as the plan of record. When
+   `docs/architecture/overview.md` was written, name it as the generated
+   diagrams. A later doctor warning on those diagrams is not a failed setup.
+   Suggest `/shipshape-doctor` as the anytime health check and
    `python3 .sdlc/scripts/checks.py run .` to run the saved checks, give one
    next step, then remove the exact directory created in step 2.
 
@@ -245,6 +250,25 @@ export SHIPSHAPE_ROOT="/absolute/path/to/the/loaded/shipshape/bundle"
    root.rmdir()
    PY
    ```
+
+11. **Optional presentation diagrams.** Skip this unless the person asks for
+    a designed picture. `docs/architecture/overview.md` is already the default
+    picture (Mermaid flowcharts drawn from the scan). A presentation pass is
+    separate. CI (the automated checks that run when you push) never
+    regenerates it.
+
+    Use the diagram-design skill from
+    `https://github.com/cathrynlavery/diagram-design` at commit
+    `d74d8c2d0c78a9e1efd43137f6a9a51182a8b5f0`. The owner is exactly
+    `cathrynlavery`. `catherynlavery/diagram-design` is an impostor fork and
+    must never be used. Write HTML and SVG under
+    `docs/architecture/presentation/`. Do not replace the generated Mermaid
+    blocks while doing this.
+
+    D2 (a different diagram language) is a documented alternative only.
+    Shipshape does not generate it. The notes for the optional parse check
+    and for mermaid-cli live in
+    [docs/sdlc/architecture-diagrams.md](../../docs/sdlc/architecture-diagrams.md).
 
 ## Don't
 

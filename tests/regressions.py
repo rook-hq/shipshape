@@ -1543,6 +1543,32 @@ def test_non_github_origin_names_the_owner_repo_fix() -> None:
         assert json.loads(github_init.stdout)["config"]["repo"]["owner_repo"] == "example/widget"
 
 
+def test_mermaid_node_labels_are_quoted_for_github() -> None:
+    """2026-11-19: unquoted flowchart labels such as Tests (pytest) failed
+    Mermaid 11 on GitHub. Quoted sequence aliases then showed the quote
+    marks, and # truncates an unquoted alias. Guard: flowchart labels are
+    double-quoted; sequence participant lines have no quotes and no #."""
+    run_focused_pytest(
+        "tests/test_architecture.py::test_flowchart_node_labels_are_double_quoted",
+    )
+
+
+def test_architecture_diagrams_fail_soft_and_stay_marked() -> None:
+    """2026-11-19: diagram generation could have failed init, or a re-apply
+    could have erased notes outside the generated blocks. Guard: the same
+    scan renders the same Mermaid, the node cap and one accent hold, a
+    failure is only a warning, and doctor warns without failing."""
+    run_focused_pytest(
+        "tests/test_architecture.py::test_render_is_deterministic_for_the_same_detect_input",
+        "tests/test_architecture.py::test_each_flowchart_uses_one_accent_class_on_the_focal_node_only",
+        "tests/test_architecture.py::test_node_cap_groups_the_overflow_into_one_node",
+        "tests/test_architecture.py::test_apply_writes_marked_diagrams_and_reapply_keeps_outside_edits",
+        "tests/test_architecture.py::test_emitter_failure_does_not_block_the_plan",
+        "tests/test_architecture.py::test_doctor_warns_on_drift_or_a_missing_file_and_never_fails",
+        "tests/test_architecture.py::test_new_init_defaults_diagrams_on_and_validation_rejects_a_bad_block",
+    )
+
+
 def test_kit_config_names_remote_protection() -> None:
     """2026-11-13: the weekly doctor failed remote protection before calling
     GitHub because this repo's config omitted features.tiered_review and left
@@ -1886,6 +1912,14 @@ def main() -> int:
         (
             "kit config names remote protection",
             test_kit_config_names_remote_protection,
+        ),
+        (
+            "architecture diagrams fail soft and stay marked",
+            test_architecture_diagrams_fail_soft_and_stay_marked,
+        ),
+        (
+            "mermaid node labels are quoted for GitHub",
+            test_mermaid_node_labels_are_quoted_for_github,
         ),
     ]
     failures = 0

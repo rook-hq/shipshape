@@ -25,8 +25,11 @@ The workflow-permissions and test-retry audits are deliberately naive text
 checks. The test-quality check runs only when features.test_quality is on. It
 warns about Python tests with no recognized assertion, never fails the
 scorecard, does not run mutation testing, and does not prove a test can catch
-a wrong change. The pre-commit audit recognizes a conservative YAML subset and
-never executes an installed hook. These checks report inspected wiring without
+a wrong change. The architecture-diagram check runs only when
+features.architecture_diagrams is on. It warns if a generated block drifted
+or the file is missing, and it never fails the scorecard. The pre-commit
+audit recognizes a conservative YAML subset and never executes an installed
+hook. These checks report inspected wiring without
 claiming that a workflow, scanner, or arbitrary dispatcher ran successfully.
 """
 
@@ -353,6 +356,61 @@ def test_retries_check(repo: Path, config: dict) -> dict:
             TEST_RETRY_NEXT_ACTION,
         )
     return check("test retries", PASS, "no test retries found")
+
+
+ARCHITECTURE_OFF = "architecture diagrams are off"
+ARCHITECTURE_ACTION = "Re-run /shipshape-init to refresh docs/architecture/overview.md."
+ARCHITECTURE_SKIPPED = "architecture diagram check was skipped because the scan did not finish"
+ARCHITECTURE_SKIPPED_ACTION = "Re-run /shipshape-doctor. Diagrams are not required for setup."
+ARCHITECTURE_CHECKER_MISSING = "architecture diagrams are on, but the diagram checker is missing"
+
+
+def architecture_diagrams_check(repo: Path, config: dict) -> dict:
+    """Warn only. A diagram problem never fails the scorecard or blocks setup."""
+    features = config.get("features", {})
+    if not isinstance(features, dict) or features.get("architecture_diagrams") is not True:
+        return check("architecture diagrams", PASS, ARCHITECTURE_OFF)
+    helper = Path(__file__).resolve().parent / "architecture.py"
+    if not helper.is_file():
+        return check(
+            "architecture diagrams",
+            WARN,
+            ARCHITECTURE_CHECKER_MISSING,
+            ARCHITECTURE_ACTION,
+        )
+    try:
+        completed = subprocess.run(
+            [sys.executable, str(helper), "check", str(repo)],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+        payload = json.loads(completed.stdout)
+    except (OSError, subprocess.TimeoutExpired, json.JSONDecodeError):
+        return check(
+            "architecture diagrams",
+            WARN,
+            ARCHITECTURE_SKIPPED,
+            ARCHITECTURE_SKIPPED_ACTION,
+        )
+    status = payload.get("status") if isinstance(payload, dict) else None
+    if status not in (PASS, WARN):
+        status = WARN
+    detail = payload.get("detail") if isinstance(payload, dict) else None
+    if not isinstance(detail, str) or not detail:
+        return check(
+            "architecture diagrams",
+            WARN,
+            ARCHITECTURE_SKIPPED,
+            ARCHITECTURE_SKIPPED_ACTION,
+        )
+    action = payload.get("next_action") if isinstance(payload, dict) else ""
+    if status == PASS:
+        action = ""
+    elif not isinstance(action, str) or not action:
+        action = ARCHITECTURE_ACTION
+    return check("architecture diagrams", status, detail, action)
 
 
 TEST_QUALITY_OFF = "test-quality check is off"
@@ -1051,6 +1109,7 @@ def setup_checks(repo: Path, config: dict, state: dict) -> list[dict]:
 
     checks.append(test_retries_check(repo, config))
     checks.append(test_quality_check(repo, config))
+    checks.append(architecture_diagrams_check(repo, config))
     checks.append(scheduled_health_check(repo, config.get("features", {})))
     board = project_board_check(repo, config)
     if board is not None:

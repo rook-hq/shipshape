@@ -55,6 +55,10 @@ export SHIPSHAPE_ROOT="/absolute/path/to/the/loaded/shipshape/bundle"
    The `remote protection` result also checks that the privileged auto-merge
    workflow is present only for a valid tiered PR configuration; helper
    presence by itself grants no authority.
+   The `architecture diagrams` check warns, and it never fails the scorecard.
+   PASS means the generated blocks match a fresh scan, or the feature is off.
+   WARN means the diagram file is missing or a generated block drifted. Say
+   that in plain words. Do not call it a failure, and do not block on it.
    The `project board` check is absent when that feature is off. When it is
    on, PASS means a linked board was confirmed on your computer and the
    weekly health check is set to add its issue. That does not prove an item

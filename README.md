@@ -318,6 +318,10 @@ Steps:
    target the default branch, bypass list empty, restrict deletions on, and
    block force pushes on. shipshape-init can plan and apply that ruleset after
    a separate yes. A ruleset you create by hand has to use those exact settings.
+6. Read `docs/architecture/overview.md` when init wrote it. Those diagrams
+   come from the scan. A warning about them does not stop setup. Designed
+   HTML under `docs/architecture/presentation/` is optional and is not
+   regenerated in CI.
 
 <br>
 

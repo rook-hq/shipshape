@@ -35,7 +35,9 @@ export SHIPSHAPE_ROOT="/absolute/path/to/the/loaded/shipshape/bundle"
 2. **Map the request to config keys.** Common ones: `workflow_style`
    (trunk/pr), `profile` (solo/team), `commands.<kind>` (the check commands:
    `test`, `lint`, `build`, `typecheck`, `format`), `owners.default`,
-   `toolchain.*`, `features.*`. If the user asks to disable a
+   `toolchain.*`, `features.*`. `features.architecture_diagrams` draws the
+   Mermaid diagrams in `docs/architecture/overview.md`. Turning it off is not
+   a security change. If the user asks to disable a
    consequence-gated feature (`features.codeql`, `features.secret_guard`,
    `features.dependabot`, `features.branch_protection`,
    `features.scheduled_health`): state the one-sentence consequence and
