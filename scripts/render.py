@@ -69,6 +69,7 @@ NODE_MANAGER_LOCKFILES = {
     "bun": {"bun.lock", "bun.lockb"},
 }
 LOGIN_RE = re.compile(r"^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
+OWNER_REPO_RE = re.compile(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+")
 CONFIG_DEST = ".sdlc/config.json"
 STATE_DEST = ".sdlc/state.json"
 PLAN_DIGEST_SCHEMA = 1
@@ -416,6 +417,41 @@ def manager_test_command(command: str, manager: str) -> str:
     return f"{manager} test"
 
 
+def protection_owner_repo_problem(config: dict, git_info: dict) -> str:
+    """Refuse branch protection until repo.owner_repo is an exact owner/name slug.
+
+    Detection fills that slug only from a github.com origin. A local path, another
+    host, or a missing origin leaves it empty, and doctor then fails closed with
+    'repository must be an exact owner/name slug'. A repository that is not a git
+    checkout is left to the init preflight; synthetic detect files without
+    git.is_repo stay valid so existing setups can still be proposed.
+    """
+    features = config.get("features")
+    if not isinstance(features, dict) or features.get("branch_protection") is not True:
+        return ""
+    repository = config.get("repo")
+    owner_repo = repository.get("owner_repo") if isinstance(repository, dict) else ""
+    if isinstance(owner_repo, str) and OWNER_REPO_RE.fullmatch(owner_repo):
+        return ""
+    if not isinstance(git_info, dict) or git_info.get("is_repo") is not True:
+        return ""
+    remote = git_info.get("remote")
+    if remote == "github":
+        why = "origin is on github.com, but its path is not an exact owner/name slug"
+    elif remote == "other":
+        why = "origin is not a github.com repository"
+    else:
+        why = "no github.com origin was detected"
+    return (
+        "features.branch_protection is on, but repo.owner_repo is empty "
+        f"({why}). Doctor fails with 'repository must be an exact owner/name slug' "
+        "until that value is an exact owner/repo slug. Add a github.com origin "
+        "(https://github.com/owner/repo.git or git@github.com:owner/repo.git) and "
+        "rerun init, or pass --set repo.owner_repo=owner/repo. To leave the remote "
+        "rule off, pass --set features.branch_protection=false."
+    )
+
+
 def build_initial_config(repo: Path, detect_file: Path, overrides: list[str]) -> dict:
     config = load_json(TEMPLATES_DIR / "sdlc" / "config.json")
     detected = load_json(detect_file)
@@ -477,6 +513,9 @@ def build_initial_config(repo: Path, detect_file: Path, overrides: list[str]) ->
     problems = validate_config(config)
     if problems:
         raise RenderError("; ".join(problems))
+    owner_problem = protection_owner_repo_problem(config, git_info)
+    if owner_problem:
+        raise RenderError(owner_problem)
     return config
 
 

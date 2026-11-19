@@ -227,9 +227,23 @@ codex plugin add shipshape@shipshape
 
 Then start a new Codex conversation in the repository you want to set up and
 run `$shipshape-init`. The bundled `.codex-plugin/plugin.json` describes the
-plugin; adding that manifest to a checkout does not install it by itself. Git
-marketplace commands fetch the version published on GitHub, not uncommitted
-changes in a local checkout.
+plugin; adding that manifest to a checkout does not install it by itself.
+
+`main` is version 0.4.0. Install from that default branch, plugin version
+0.4.0, until the next GitHub Release is cut. The Releases page latest is still
+[v0.2.1](https://github.com/rook-hq/shipshape/releases/tag/v0.2.1). 0.3.0 and
+0.4.0 were not tagged, so that page is behind `main`.
+
+`codex plugin marketplace add rook-hq/shipshape` and
+`/plugin marketplace add rook-hq/shipshape` clone this repository. They do not
+download a GitHub Release. `.claude-plugin/marketplace.json` lists the plugin
+with `"source": "./"` and `"version": "0.4.0"`. `./` is this repository root.
+That entry sets no git ref, no commit, and no release asset.
+`.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` also say `0.4.0`.
+Claude Code uses the repository default branch unless the command adds `#ref`.
+Codex uses the default branch unless the command passes `--ref`. Here that
+branch is `main`. A local checkout's uncommitted edits are not what those
+commands install.
 
 To use an unpublished local checkout with Codex, register its actual absolute
 path instead (after resolving any existing marketplace with the same name):
@@ -256,11 +270,54 @@ In Claude Code, use its in-app marketplace commands:
 Replace `rook-hq/shipshape` with the checkout's absolute path to test local,
 unpublished Claude Code changes.
 
-Needs `git` and Python 3.10 or newer (check with `python3 --version`). On
-macOS, `xcode-select --install` provides git; get a current Python from
-python.org or Homebrew. On Linux, use your package manager. Releases, access
-changes and the GitHub branch rule also need the GitHub CLI (`gh`), signed
-in; shipshape tells you how to install it if it's missing.
+## Prerequisites
+
+- `git` and Python 3.10 or newer (`python3 --version`). On macOS,
+  `xcode-select --install` provides git; get a current Python from python.org
+  or Homebrew. On Linux, use your package manager. Releases, access changes,
+  and the GitHub branch rule also need the GitHub CLI (`gh`), signed in.
+  Shipshape tells you how to install it if it's missing.
+- A github.com `origin` when branch protection stays on (it is on by default):
+  `https://github.com/owner/repo.git` or `git@github.com:owner/repo.git`. A
+  missing origin, a local path, or any other host leaves `repo.owner_repo`
+  empty. Doctor then fails with `repository must be an exact owner/name slug`.
+  Add the github.com origin and rerun init, pass
+  `--set repo.owner_repo=owner/repo`, or pass
+  `--set features.branch_protection=false`.
+- A Node project (`package.json`) needs a committed npm lockfile before init:
+  `package-lock.json` or `npm-shrinkwrap.json`. Yarn and pnpm need an exact
+  `packageManager` field (`yarn@x.y.z` or `pnpm@x.y.z`) plus the matching
+  lockfile (`yarn.lock` or `pnpm-lock.yaml`). Bun is the same shape
+  (`bun@x.y.z` with `bun.lock` or `bun.lockb`). Without that, init hard-stops
+  and does not guess a manager:
+  `package.json identifies a Node project, but no package-lock.json or npm-shrinkwrap.json was found; commit an npm lockfile before initializing shipshape`.
+
+## Onboarding a new product
+
+Do these in order.
+
+Prerequisites for the GitHub repository:
+
+- The default branch exists (usually `main`).
+- GitHub Actions is enabled.
+- You can administer the repository (the branch ruleset needs that).
+- `origin` is a github.com URL, or you will pass `--set repo.owner_repo=owner/repo`.
+- If the project is Node, the lockfile rule above is already met.
+
+Steps:
+
+1. Install shipshape from the default branch `main`, plugin version 0.4.0.
+   The Releases page latest, v0.2.1, is behind `main`.
+2. In the product repository, run shipshape-init. Read the preview, then apply
+   it. Nothing is written before you accept the preview.
+3. Install the local secret-guard hook with `bash .sdlc/hooks/install.sh`.
+   Init runs that when the secret guard is on.
+4. Commit the new files and push them to the default branch.
+5. Turn on the branch ruleset. For the default straight-to-main setup the
+   ruleset is named exactly `Shipshape branch protection`, enforcement Active,
+   target the default branch, bypass list empty, restrict deletions on, and
+   block force pushes on. shipshape-init can plan and apply that ruleset after
+   a separate yes. A ruleset you create by hand has to use those exact settings.
 
 <br>
 

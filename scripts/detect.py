@@ -1196,10 +1196,16 @@ def detect_hooks(root: Path) -> dict:
 
 
 def _parse_remote(url: str) -> tuple[str, str]:
-    """Split a git remote URL (ssh or https form) into (host, owner/repo)."""
+    """Split a git remote URL (ssh or https form) into (host, owner/repo).
+
+    HTTPS userinfo is optional and is not part of the host. A credentialed
+    GitHub URL such as https://user:token@github.com/owner/repo.git is still
+    github.com. The host is compared exactly later, so a lookalike name cannot
+    borrow the github.com label from the userinfo or from another suffix.
+    """
     match = re.match(r"(?:ssh://)?git@([^:/]+)[:/](.+)", url)
     if not match:
-        match = re.match(r"https?://([^/@]+)/(.+)", url)
+        match = re.match(r"https?://(?:[^/@]*@)?([^/:]+)(?::[0-9]+)?/(.+)", url)
     if not match:
         return "", ""
     return match.group(1).lower(), match.group(2).removesuffix(".git")
