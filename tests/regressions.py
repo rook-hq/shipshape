@@ -1424,6 +1424,125 @@ def test_test_scan_keeps_warnings_and_skips_dependencies() -> None:
     )
 
 
+def _init_from_detect(
+    repo: Path, detect_file: Path, *overrides: str
+) -> subprocess.CompletedProcess:
+    args = [
+        sys.executable,
+        str(SCRIPTS / "render.py"),
+        "init-config",
+        str(repo),
+        "--detect",
+        str(detect_file),
+    ]
+    for override in overrides:
+        args.extend(["--set", override])
+    return subprocess.run(args, capture_output=True, text=True)
+
+
+def _git_repo_with_origin(root: Path, origin: str) -> Path:
+    repo = root / "consumer"
+    repo.mkdir(parents=True)
+    subprocess.run(["git", "init", "-qb", "main", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "remote", "add", "origin", origin], check=True)
+    (repo / "README.md").write_text("hello\n", encoding="utf-8")
+    return repo
+
+
+def test_non_github_origin_names_the_owner_repo_fix() -> None:
+    """2026-11-19: a local bare origin, any non-GitHub origin, or a git repo
+    with no origin left repo.owner_repo empty while branch protection stayed
+    on. Doctor then failed with 'repository must be an exact owner/name slug'
+    and init had already written the config. Guard: init-config refuses that
+    config and names a github.com origin or --set repo.owner_repo=owner/repo.
+    A github.com origin, an explicit slug, or branch protection turned off
+    still initializes."""
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        bare = root / "origin.git"
+        subprocess.run(["git", "init", "-qb", "--bare", str(bare)], check=True)
+        local = _git_repo_with_origin(root / "local", str(bare))
+        detect_file = root / "local-detect.json"
+        detected = subprocess.run(
+            [sys.executable, str(SCRIPTS / "detect.py"), str(local), "--no-network"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        detect_file.write_text(detected.stdout, encoding="utf-8")
+        git_info = json.loads(detected.stdout)["git"]
+        assert git_info["remote"] == "other", git_info
+        assert git_info["owner_repo"] == "", git_info
+
+        refused = _init_from_detect(local, detect_file)
+        assert refused.returncode == 1, refused.stdout
+        error = json.loads(refused.stdout)["error"]
+        assert "features.branch_protection is on" in error, error
+        assert "not a github.com repository" in error, error
+        assert "--set repo.owner_repo=owner/repo" in error, error
+        assert "repository must be an exact owner/name slug" in error, error
+        assert not (local / ".sdlc" / "config.json").exists()
+
+        accepted = _init_from_detect(local, detect_file, "repo.owner_repo=example/widget")
+        assert accepted.returncode == 0, accepted.stdout
+        created = json.loads(accepted.stdout)
+        assert created["config"]["repo"]["owner_repo"] == "example/widget"
+        assert created["config"]["features"]["branch_protection"] is True
+
+        unprotected = root / "unprotected"
+        unprotected_repo = _git_repo_with_origin(unprotected, str(bare))
+        unprotected_detect = root / "unprotected-detect.json"
+        unprotected_detect.write_text(detected.stdout, encoding="utf-8")
+        skipped = _init_from_detect(
+            unprotected_repo,
+            unprotected_detect,
+            "features.branch_protection=false",
+        )
+        assert skipped.returncode == 0, skipped.stdout
+        assert json.loads(skipped.stdout)["config"]["repo"]["owner_repo"] == ""
+
+        missing = _git_repo_with_origin(root / "missing", "https://gitlab.com/example/widget.git")
+        subprocess.run(["git", "-C", str(missing), "remote", "remove", "origin"], check=True)
+        missing_detect = root / "missing-detect.json"
+        missing_proc = subprocess.run(
+            [sys.executable, str(SCRIPTS / "detect.py"), str(missing), "--no-network"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        missing_detect.write_text(missing_proc.stdout, encoding="utf-8")
+        missing_git = json.loads(missing_proc.stdout)["git"]
+        assert missing_git["is_repo"] is True, missing_git
+        assert missing_git["remote"] == "", missing_git
+        missing_init = _init_from_detect(missing, missing_detect)
+        assert missing_init.returncode == 1, missing_init.stdout
+        assert "no github.com origin was detected" in json.loads(missing_init.stdout)["error"]
+
+        from scripts import detect
+
+        credentialed = "https://user:placeholder@github.com/example/widget.git"
+        assert detect._parse_remote(credentialed) == ("github.com", "example/widget")
+        lookalike = "https://user:placeholder@evilgithub.com.attacker.example/owner/repo.git"
+        assert detect._parse_remote(lookalike)[0] != "github.com"
+        borrowed = "https://github.com@evil.example/owner/repo.git"
+        assert detect._parse_remote(borrowed)[0] == "evil.example"
+
+        github = _git_repo_with_origin(root / "github", "https://github.com/example/widget.git")
+        github_detect = root / "github-detect.json"
+        github_proc = subprocess.run(
+            [sys.executable, str(SCRIPTS / "detect.py"), str(github), "--no-network"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        github_detect.write_text(github_proc.stdout, encoding="utf-8")
+        github_git = json.loads(github_proc.stdout)["git"]
+        assert github_git["owner_repo"] == "example/widget", github_git
+        github_init = _init_from_detect(github, github_detect)
+        assert github_init.returncode == 0, github_init.stdout
+        assert json.loads(github_init.stdout)["config"]["repo"]["owner_repo"] == "example/widget"
+
+
 def test_kit_config_names_remote_protection() -> None:
     """2026-11-13: the weekly doctor failed remote protection before calling
     GitHub because this repo's config omitted features.tiered_review and left
@@ -1759,6 +1878,10 @@ def main() -> int:
         (
             "test scan keeps warnings and skips dependencies",
             test_test_scan_keeps_warnings_and_skips_dependencies,
+        ),
+        (
+            "non-github origin names the owner_repo fix",
+            test_non_github_origin_names_the_owner_repo_fix,
         ),
         (
             "kit config names remote protection",

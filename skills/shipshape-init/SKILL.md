@@ -40,6 +40,35 @@ export SHIPSHAPE_ROOT="/absolute/path/to/the/loaded/shipshape/bundle"
      or Homebrew; Windows: python.org installer).
    - Not a git repository: offer to run `git init -b main` first and explain in
      one sentence what a git repository is.
+   - Node project (`package.json` is present). Init hard-stops unless an npm
+     lockfile is already committed (`package-lock.json` or
+     `npm-shrinkwrap.json`). Yarn and pnpm are accepted only when
+     `package.json` sets an exact `packageManager` field (`yarn@x.y.z` or
+     `pnpm@x.y.z`) and the matching lockfile is committed (`yarn.lock` or
+     `pnpm-lock.yaml`). Bun is the same shape (`bun@x.y.z` with `bun.lock` or
+     `bun.lockb`). A bare `package.json` stops with this text, unchanged:
+     `package.json identifies a Node project, but no package-lock.json or
+     npm-shrinkwrap.json was found; commit an npm lockfile before initializing
+     shipshape`. Say that, tell them the one file to commit, and stop. Do not
+     weaken or skip that gate.
+   - Branch protection stays on unless the user turns it off
+     (`features.branch_protection`). It needs `repo.owner_repo` to be an exact
+     `owner/repo` slug. Detect fills that slug only from a github.com origin
+     (`https://github.com/owner/repo.git` or `git@github.com:owner/repo.git`,
+     including an https URL that carries a username or token). A missing
+     origin, a local path, or any other host leaves the slug empty. Doctor
+     then FAILs with `repository must be an exact owner/name slug`. Check the
+     origin before the interview:
+
+     ```bash
+     git remote get-url origin
+     ```
+
+     If that command fails, or the host is not github.com, stop. Ask them to
+     add a github.com origin, to give the exact `owner/repo` you will pass as
+     `--set repo.owner_repo=owner/repo` on the init-config command, or to turn
+     the feature off with `--set features.branch_protection=false`. Do not
+     invent an owner or a name. Pass the `--set` they choose in step 4.
 
 2. **Create a private session directory, then scan the project.** Keep this
    directory until setup finishes so the reviewed files are the ones applied.
@@ -73,7 +102,11 @@ export SHIPSHAPE_ROOT="/absolute/path/to/the/loaded/shipshape/bundle"
      --set commands.test="<confirmed test command>"
    ```
 
-   Pass a `--set` for every answer that differs from the detected default.
+   Pass a `--set` for every answer that differs from the detected default,
+   including `repo.owner_repo=owner/repo` or `features.branch_protection=false`
+   when preflight agreed one of those. If the command's error names a missing
+   npm lockfile or an empty `repo.owner_repo`, translate that error and stop.
+   Do not retry by turning branch protection off unless they already chose that.
    Completion criterion: the command reports `action: proposed`, and the
    repository is still unchanged.
 

@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Init now refuses branch protection when `origin` is missing or is not a
+  github.com repository, and says to add that origin or pass
+  `--set repo.owner_repo=owner/repo`. A github.com URL that includes a
+  username or token still counts. The README and init preflight also name
+  the Node lockfile prerequisite and say to install plugin version 0.4.0
+  from `main` while the GitHub Releases page still shows v0.2.1.
 - The Lighthouse check uses the worst of its three runs, so one good run
   cannot hide a run that misses a budget. Performance must stay at or
   above 0.90 on every run.
