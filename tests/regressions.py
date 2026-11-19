@@ -1544,10 +1544,10 @@ def test_non_github_origin_names_the_owner_repo_fix() -> None:
 
 
 def test_mermaid_node_labels_are_quoted_for_github() -> None:
-    """2026-11-19: unquoted labels such as Tests (pytest) and Other parts (N)
-    failed Mermaid 11 on GitHub with 'Unable to render'. beautiful-mermaid
-    still accepted them. Guard: every flowchart node label is double-quoted,
-    including parentheses, #, &, :, -->, and the word end."""
+    """2026-11-19: unquoted flowchart labels such as Tests (pytest) failed
+    Mermaid 11 on GitHub. Quoted sequence aliases then showed the quote
+    marks, and # truncates an unquoted alias. Guard: flowchart labels are
+    double-quoted; sequence participant lines have no quotes and no #."""
     run_focused_pytest(
         "tests/test_architecture.py::test_flowchart_node_labels_are_double_quoted",
     )

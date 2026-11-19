@@ -114,6 +114,13 @@ def safe_label(value: str, fallback: str) -> str:
     return text[:80] or fallback
 
 
+def sequence_label(value: str) -> str:
+    """Unquoted sequence aliases. Mermaid treats # as a comment, so drop it too."""
+    text = _UNSAFE_LABEL.sub(" ", value).replace("#", " ")
+    text = re.sub(r"\s+", " ", text).strip()
+    return text[:80] or "App"
+
+
 def _strings(value: object) -> list[str]:
     if not isinstance(value, list):
         return []
@@ -300,12 +307,12 @@ def request_flow(detected: dict) -> str | None:
     found = sorted(name for name in _strings(detected.get("frameworks")) if name in WEB_FRAMEWORKS)
     if not found:
         return None
-    label = framework_label(found[0])
+    label = sequence_label(framework_label(found[0]))
     return "\n".join(
         [
             "sequenceDiagram",
-            f"  actor Person as {quoted_label('Person')}",
-            f"  participant App as {quoted_label(label)}",
+            "  actor Person",
+            f"  participant App as {label}",
             "  Person->>App: HTTP request",
             "  App-->>Person: HTTP response",
         ]

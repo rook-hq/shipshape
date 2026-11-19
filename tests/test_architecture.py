@@ -114,8 +114,18 @@ def test_flowchart_node_labels_are_double_quoted():
     sequence = next(
         block for block in mermaid_blocks(rendered) if block.startswith("sequenceDiagram")
     )
-    assert 'participant App as "' in sequence
-    assert re.search(r'participant \w+ as "[^"]+"', sequence)
+    assert "  actor Person\n" in sequence
+    participant_lines = [
+        line for line in sequence.splitlines() if line.strip().startswith("participant ")
+    ]
+    assert participant_lines
+    for line in participant_lines:
+        assert '"' not in line
+        assert "#" not in line
+    cleaned = architecture.sequence_label("end --> core: # & (suite)")
+    assert "#" not in cleaned
+    for token in ("(", ")", "&", ":", "-->", "end"):
+        assert token in cleaned
 
 
 def test_each_flowchart_uses_one_accent_class_on_the_focal_node_only():
@@ -132,7 +142,8 @@ def test_each_flowchart_uses_one_accent_class_on_the_focal_node_only():
     sequence = [block for block in mermaid_blocks(rendered) if "sequenceDiagram" in block]
     assert len(sequence) == 1
     assert "classDef" not in sequence[0]
-    assert 'participant App as "FastAPI"' in sequence[0]
+    assert "participant App as FastAPI" in sequence[0]
+    assert '"' not in sequence[0]
 
 
 def test_node_cap_groups_the_overflow_into_one_node():
