@@ -3,7 +3,7 @@
   when it reviews pull requests here and when it works on tasks. The review
   standards below mirror this project's working agreement.
   Safe to edit: yes — shipshape will ask before overwriting your edits.
-  managed-by: shipshape v0.4.0
+  managed-by: shipshape v0.5.0
 -->
 
 # Copilot Instructions for shipshape
