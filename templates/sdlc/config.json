@@ -19,7 +19,14 @@
     "project_board": false,
     "provenance_labels": false,
     "test_quality": false,
-    "progressive_delivery": false
+    "progressive_delivery": false,
+    "architecture_diagrams": true
+  },
+  "diagrams": {
+    "engine": "mermaid",
+    "views": ["system_context", "container", "request_flow"],
+    "max_nodes": 9,
+    "ci_validate": false
   },
   "commands": {
     "test": "",

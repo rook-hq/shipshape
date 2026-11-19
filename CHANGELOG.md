@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Architecture diagrams for a new setup (`features.architecture_diagrams`,
+  on unless an existing config leaves the key unset). A pure-Python emitter
+  writes Mermaid flowcharts, and one sequence diagram when a server
+  framework was detected, to `docs/architecture/overview.md`. Re-apply
+  replaces the generated blocks and keeps text outside them. Doctor warns
+  if a block drifts and does not fail the scorecard. Optional CI rendering
+  with beautiful-mermaid 1.1.3 stays off unless `diagrams.ci_validate` is
+  true. A designed HTML pass is documented and is not regenerated in CI.
 - A launch film on the marketing site, directly under the hero, and a
   poster in the README that links to it. The film loops muted while it is
   on screen, and stays on the poster when the visitor prefers reduced

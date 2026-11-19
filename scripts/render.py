@@ -354,9 +354,48 @@ def validate_config(config) -> list[str]:
     if "owner_repo" in repository and not isinstance(repository["owner_repo"], str):
         problems.append("repo.owner_repo must be a string")
     problems.extend(validate_project_config(config))
+    problems.extend(validate_diagrams_config(config))
     if problems:
         return problems
     return validate_node_manager_config(config)
+
+
+def validate_diagrams_config(config: dict) -> list[str]:
+    """Accept a missing diagrams block so existing installs stay valid."""
+    if "diagrams" not in config:
+        return []
+    diagrams = config["diagrams"]
+    if not isinstance(diagrams, dict):
+        return ["diagrams must be an object"]
+    problems = []
+    unknown = sorted(set(diagrams) - {"engine", "views", "max_nodes", "ci_validate"})
+    if unknown:
+        problems.append("diagrams contains unknown keys: " + ", ".join(unknown))
+    if "engine" in diagrams and diagrams["engine"] != "mermaid":
+        problems.append("diagrams.engine must be mermaid")
+    views = diagrams.get("views")
+    known = ("system_context", "container", "request_flow")
+    if views is not None:
+        if (
+            not isinstance(views, list)
+            or not all(isinstance(item, str) for item in views)
+            or len(views) != len(set(views))
+            or any(item not in known for item in views)
+        ):
+            problems.append(
+                "diagrams.views must be unique names from system_context, container, request_flow"
+            )
+    max_nodes = diagrams.get("max_nodes")
+    if "max_nodes" in diagrams and (type(max_nodes) is not int or not 1 <= max_nodes <= 9):
+        problems.append("diagrams.max_nodes must be an integer from 1 to 9")
+    ci_validate = diagrams.get("ci_validate")
+    if "ci_validate" in diagrams and type(ci_validate) is not bool:
+        problems.append("diagrams.ci_validate must be a boolean")
+    features = config.get("features")
+    enabled = isinstance(features, dict) and features.get("architecture_diagrams") is True
+    if ci_validate is True and not enabled:
+        problems.append("diagrams.ci_validate requires features.architecture_diagrams to be true")
+    return problems
 
 
 def validate_project_config(config: dict) -> list[str]:
@@ -678,6 +717,15 @@ def entry_applies(entry: dict, config: dict) -> bool:
             return False
         if key == "feature_off" and isinstance(expected, str) and features.get(expected) is True:
             return False
+        if key == "diagrams_ci_validate":
+            diagrams = config.get("diagrams")
+            enabled = (
+                isinstance(diagrams, dict)
+                and diagrams.get("ci_validate") is True
+                and features.get("architecture_diagrams") is True
+            )
+            if enabled != expected:
+                return False
     return True
 
 
@@ -987,12 +1035,164 @@ def compute_plan(
             plan["skips"].append({"path": dest, "reason": "up to date"})
         else:
             plan["regenerates"].append({"path": dest, "pillar": entry["pillar"]})
+    attach_architecture_files(plan, repo, effective_config, state)
     if not plan["ok"]:
         plan["status"] = "invalid"
     elif plan["conflicts"]:
         plan["status"] = "conflicts"
     attach_plan_digest(plan)
     return plan
+
+
+ARCHITECTURE_OVERVIEW = "docs/architecture/overview.md"
+ARCHITECTURE_SCRIPT = ".sdlc/scripts/architecture.py"
+DETECT_COPY = ".sdlc/scripts/detect.py"
+ARCHITECTURE_PATHS = (ARCHITECTURE_OVERVIEW, ARCHITECTURE_SCRIPT, DETECT_COPY)
+ARCHITECTURE_TEMPLATES = {
+    ARCHITECTURE_OVERVIEW: "architecture/overview.md",
+    ARCHITECTURE_SCRIPT: "scripts/architecture.py",
+    DETECT_COPY: "scripts/detect.py",
+}
+
+
+def _architecture_enabled(config: dict) -> bool:
+    features = config.get("features")
+    return isinstance(features, dict) and features.get("architecture_diagrams") is True
+
+
+def _architecture_warning(plan: dict, path: str, message: str) -> None:
+    plan.setdefault("warnings", []).append({"path": path, "warning": message})
+
+
+def attach_architecture_files(plan: dict, repo: Path, config: dict, state: dict) -> None:
+    """Add diagram files, or skip them. A failure here never invalidates the plan."""
+    try:
+        _attach_architecture_files(plan, repo, config, state)
+    except Exception as error:
+        detail = str(error).splitlines()[0][:200] if str(error) else error.__class__.__name__
+        _architecture_warning(
+            plan,
+            ARCHITECTURE_OVERVIEW,
+            f"architecture diagrams skipped: {detail}",
+        )
+
+
+def _attach_architecture_files(plan: dict, repo: Path, config: dict, state: dict) -> None:
+    import architecture
+
+    if not _architecture_enabled(config):
+        _retire_architecture_files(plan, repo, state)
+        return
+    detected = architecture.run_detect(repo)
+    fresh = architecture.render_overview(
+        detected,
+        architecture.options_from_config(config),
+        plan["kit_version"],
+    )
+    _plan_overview(plan, repo, fresh)
+    for name, dest in (
+        ("architecture.py", ARCHITECTURE_SCRIPT),
+        ("detect.py", DETECT_COPY),
+    ):
+        _plan_copied_script(
+            plan,
+            repo,
+            state,
+            dest,
+            architecture.bundled_script(name, plan["kit_version"]),
+        )
+
+
+def _plan_overview(plan: dict, repo: Path, fresh: str) -> None:
+    import architecture
+
+    dest = ARCHITECTURE_OVERVIEW
+    dest_path, status = repo_path_status(repo, dest)
+    current = None
+    if status == "file":
+        current = dest_path.read_text(encoding="utf-8")
+    plan["observed"][dest] = observe_file(dest_path, status)
+    mode = serialized_mode(generated_mode(None))
+    plan["meta"][dest] = {"template": ARCHITECTURE_TEMPLATES[dest], "mode": mode}
+    if status == "missing":
+        plan["rendered"][dest] = fresh
+        plan["writes"].append({"path": dest, "pillar": "onboarding"})
+        return
+    if status != "file":
+        _architecture_warning(plan, dest, f"{dest} is not a regular file")
+        return
+    try:
+        merged = architecture.merge_overview(current, fresh)
+    except architecture.DiagramSkipped as error:
+        _architecture_warning(plan, dest, str(error))
+        plan["skips"].append({"path": dest, "reason": str(error)})
+        return
+    plan["rendered"][dest] = merged
+    current_bytes = dest_path.read_bytes()
+    mode_matches = serialized_mode(dest_path.lstat().st_mode) == mode
+    if merged.encode("utf-8") == current_bytes and mode_matches:
+        plan["skips"].append({"path": dest, "reason": "up to date"})
+        return
+    plan["regenerates"].append({"path": dest, "pillar": "onboarding"})
+
+
+def _plan_copied_script(plan: dict, repo: Path, state: dict, dest: str, rendered: str) -> None:
+    dest_path, status = repo_path_status(repo, dest)
+    plan["observed"][dest] = observe_file(dest_path, status)
+    expected_mode = generated_mode(None)
+    mode = serialized_mode(expected_mode)
+    plan["meta"][dest] = {"template": ARCHITECTURE_TEMPLATES[dest], "mode": mode}
+    plan["rendered"][dest] = rendered
+    recorded = state["files"].get(dest)
+    if status == "missing":
+        plan["writes"].append({"path": dest, "pillar": "workflows"})
+        return
+    if status != "file":
+        _architecture_warning(plan, dest, f"{dest} is not a regular file")
+        return
+    if recorded is None:
+        plan["conflicts"].append(
+            {"path": dest, "reason": "file already exists and was not written by shipshape"}
+        )
+        return
+    drift = drift_reason(dest_path, recorded, expected_mode)
+    if drift:
+        plan["conflicts"].append({"path": dest, "reason": drift})
+        return
+    target_mode_changed = recorded.get("mode") not in (None, mode)
+    if rendered.encode("utf-8") == dest_path.read_bytes() and not target_mode_changed:
+        plan["skips"].append({"path": dest, "reason": "up to date"})
+    else:
+        plan["regenerates"].append({"path": dest, "pillar": "workflows"})
+
+
+def _retire_architecture_files(plan: dict, repo: Path, state: dict) -> None:
+    for dest in ARCHITECTURE_PATHS:
+        try:
+            dest_path, status = repo_path_status(repo, dest)
+        except RenderError as error:
+            _architecture_warning(plan, dest, f"architecture diagrams skipped: {error}")
+            continue
+        if status == "missing":
+            continue
+        plan["observed"][dest] = observe_file(dest_path, status)
+        if status != "file":
+            _architecture_warning(plan, dest, f"{dest} is not a regular file")
+            continue
+        recorded = state["files"].get(dest)
+        if recorded is None:
+            continue
+        drift = drift_reason(dest_path, recorded, generated_mode(None))
+        if drift:
+            plan["conflicts"].append(
+                {
+                    "path": dest,
+                    "reason": f"inactive managed file {drift}",
+                    "action": "remove",
+                }
+            )
+            continue
+        plan["removals"].append({"path": dest, "pillar": "onboarding"})
 
 
 def public_plan(plan: dict) -> dict:
@@ -1075,8 +1275,9 @@ def apply_result(
     versions: dict,
     state_written: bool,
     binding: dict,
+    warnings: list | None = None,
 ) -> dict:
-    return {
+    result = {
         "ok": ok,
         "status": status,
         "complete": status == "complete",
@@ -1091,6 +1292,9 @@ def apply_result(
         "state_written": state_written,
         "binding": binding,
     }
+    if warnings:
+        result["warnings"] = warnings
+    return result
 
 
 def cmd_apply(
@@ -1240,6 +1444,7 @@ def cmd_apply(
 
     removed = []
     operation_errors = []
+    warnings = list(plan.get("warnings", []))
     for dest in [item["path"] for item in plan["removals"]] + forced_removals:
         try:
             dest_path, status = repo_path_status(repo, dest)
@@ -1248,6 +1453,11 @@ def cmd_apply(
             elif status != "missing":
                 raise RenderError(f"{dest}: removal target must be a regular file")
         except (OSError, RenderError) as error:
+            if dest in ARCHITECTURE_PATHS:
+                warnings.append(
+                    {"path": dest, "warning": f"architecture diagrams skipped: {error}"}
+                )
+                continue
             operation_errors.append({"path": dest, "operation": "remove", "error": str(error)})
             continue
         state["files"].pop(dest, None)
@@ -1262,6 +1472,11 @@ def cmd_apply(
         try:
             atomic_write_repo(repo, dest, content, int(mode, 8))
         except (OSError, RenderError) as error:
+            if dest in ARCHITECTURE_PATHS:
+                warnings.append(
+                    {"path": dest, "warning": f"architecture diagrams skipped: {error}"}
+                )
+                continue
             operation_errors.append({"path": dest, "operation": "write", "error": str(error)})
             continue
         state["files"][dest] = {
@@ -1324,6 +1539,7 @@ def cmd_apply(
         versions=versions,
         state_written=state_written,
         binding=binding,
+        warnings=warnings,
     )
     print(json.dumps(result, indent=2))
     return 0 if result["ok"] else 1
