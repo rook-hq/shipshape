@@ -2,7 +2,7 @@
 # What this is: runs this repository's checks (tests, lint, build, typecheck,
 # format) once each and prints one JSON result; its "ok" says whether all passed.
 # Safe to edit: yes — shipshape will ask before overwriting your edits.
-# managed-by: shipshape v0.4.0
+# managed-by: shipshape v0.5.0
 """Run a repository's checks once each (ADR 0002: stdlib only, JSON-only stdout).
 
 Usage:

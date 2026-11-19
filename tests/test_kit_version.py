@@ -16,7 +16,7 @@ import sys
 from conftest import KIT_ROOT, SCRIPTS, run_script
 
 # Bumped in the release commit with the manifests, so a half-bumped release fails.
-RELEASE = "0.4.0"
+RELEASE = "0.5.0"
 PYPROJECT_VERSION = re.compile(r'^version = "([^"]+)"$', re.MULTILINE)
 SITE_HEADER = "<mark>managed-by:</mark> shipshape v{}</pre>"
 # Hand-written or locally edited on purpose; apply never touches them unforced.

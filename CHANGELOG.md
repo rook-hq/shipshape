@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-19
+
 ### Added
 
 - Architecture diagrams for a new setup (`features.architecture_diagrams`,
@@ -137,6 +139,8 @@ moved from 0.2.1 straight to 0.3.0 once the work below had landed.
 
 0.3.0 and 0.4.0 were not tagged, so they have no release-to-release compare URL.
 
+[Unreleased]: https://github.com/rook-hq/shipshape/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/rook-hq/shipshape/compare/v0.4.0...v0.5.0
 [0.2.1]: https://github.com/KevNev19/shipshape/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/KevNev19/shipshape/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/KevNev19/shipshape/releases/tag/v0.1.0

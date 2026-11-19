@@ -229,17 +229,17 @@ Then start a new Codex conversation in the repository you want to set up and
 run `$shipshape-init`. The bundled `.codex-plugin/plugin.json` describes the
 plugin; adding that manifest to a checkout does not install it by itself.
 
-`main` is version 0.4.0. Install from that default branch, plugin version
-0.4.0, until the next GitHub Release is cut. The Releases page latest is still
-[v0.2.1](https://github.com/rook-hq/shipshape/releases/tag/v0.2.1). 0.3.0 and
-0.4.0 were not tagged, so that page is behind `main`.
+`main` is version 0.5.0. The latest GitHub Release is
+[v0.5.0](https://github.com/rook-hq/shipshape/releases/tag/v0.5.0).
+0.3.0 and 0.4.0 were never tagged. Marketplace installs clone the default
+branch. They do not download a Release.
 
 `codex plugin marketplace add rook-hq/shipshape` and
 `/plugin marketplace add rook-hq/shipshape` clone this repository. They do not
 download a GitHub Release. `.claude-plugin/marketplace.json` lists the plugin
-with `"source": "./"` and `"version": "0.4.0"`. `./` is this repository root.
+with `"source": "./"` and `"version": "0.5.0"`. `./` is this repository root.
 That entry sets no git ref, no commit, and no release asset.
-`.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` also say `0.4.0`.
+`.claude-plugin/plugin.json` and `.codex-plugin/plugin.json` also say `0.5.0`.
 Claude Code uses the repository default branch unless the command adds `#ref`.
 Codex uses the default branch unless the command passes `--ref`. Here that
 branch is `main`. A local checkout's uncommitted edits are not what those
@@ -306,8 +306,11 @@ Prerequisites for the GitHub repository:
 
 Steps:
 
-1. Install shipshape from the default branch `main`, plugin version 0.4.0.
-   The Releases page latest, v0.2.1, is behind `main`.
+1. Install shipshape from the default branch `main`, plugin version 0.5.0.
+   The latest GitHub Release is
+   [v0.5.0](https://github.com/rook-hq/shipshape/releases/tag/v0.5.0).
+   0.3.0 and 0.4.0 were never tagged. A marketplace install clones that
+   default branch. It does not download a Release.
 2. In the product repository, run shipshape-init. Read the preview, then apply
    it. Nothing is written before you accept the preview.
 3. Install the local secret-guard hook with `bash .sdlc/hooks/install.sh`.
